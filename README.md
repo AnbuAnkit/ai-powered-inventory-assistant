@@ -83,6 +83,14 @@ backend or its SQLite database. For a live demo, keep the Expo tunnel and the
 backend reachable for the duration of the presentation; never put
 `GOOGLE_API_KEY` in a `EXPO_PUBLIC_*` variable.
 
+For a separate Vercel backend project, use the repository root as its Root
+Directory, leave the Build Command unset so Vercel uses its Python runtime,
+and deploy the FastAPI entrypoint configured in `pyproject.toml`. The repository
+pins Python 3.12 for Vercel; `pyproject.toml` still declares Python 3.11 as the
+minimum supported version for local development. Do not set `uv run
+inventory-api` as the Vercel Build Command; that command starts a local server
+rather than configuring the serverless function.
+
 ## API
 
 | Method | Path               | Purpose                                              |
