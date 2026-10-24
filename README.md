@@ -66,6 +66,23 @@ prototype for Vercel, set `EXPO_PUBLIC_EXPO_GO_URL` to the active Expo Go URL
 so the deployed QR points to the development server. See
 `mobile/.env.example` for the backend URL setting.
 
+### Deploy the web prototype to Vercel
+
+1. Import this Git repository in Vercel and set the project **Root Directory**
+   to `mobile`. The Vercel build settings in `mobile/vercel.json` export the
+   Expo web app to `dist`.
+2. Add these Vercel environment variables for the Production environment:
+   - `EXPO_PUBLIC_EXPO_GO_URL`: the `exp://...` URL printed by
+     `npx expo start --go --tunnel`.
+   - `EXPO_PUBLIC_API_URL`: a public HTTPS URL for the FastAPI backend.
+3. Deploy or redeploy after setting the variables. The QR URL is embedded at
+   build time, so redeploy the web app if the Expo tunnel URL changes.
+
+Vercel hosts only the static web frontend here. It does not host the FastAPI
+backend or its SQLite database. For a live demo, keep the Expo tunnel and the
+backend reachable for the duration of the presentation; never put
+`GOOGLE_API_KEY` in a `EXPO_PUBLIC_*` variable.
+
 ## API
 
 | Method | Path               | Purpose                                              |
