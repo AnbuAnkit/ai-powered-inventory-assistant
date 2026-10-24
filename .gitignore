@@ -1,0 +1,22 @@
+# Python / backend
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.local
+
+# Expo / React Native
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/.env
+mobile/.env.local
+mobile/expo-env.d.ts
+mobile/.expo-shared/
+npm-debug.log*
+yarn-error.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
