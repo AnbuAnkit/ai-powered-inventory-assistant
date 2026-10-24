@@ -50,13 +50,21 @@ npm run web               # http://localhost:8081
 
 ```bash
 cd mobile
-npm start        # scan the QR code with Expo Go, or press i / a for simulators
+npx expo start --go --lan
 ```
 
-The client resolves the API automatically: `localhost` on web and the iOS
-simulator, Metro's LAN IP on a real device, and `10.0.2.2` on the Android
-emulator (which maps to your machine). Your phone must be on the same Wi-Fi.
-For a deployed backend set `EXPO_PUBLIC_API_URL` (see `mobile/.env.example`).
+The web prototype has an **Open on phone** button in its header that displays
+the Expo Go QR code. Keep the Expo development server running, then scan the
+code with Expo Go. For local testing, open the web app at
+`http://<computer-lan-ip>:8081` (not `localhost`) and connect the phone and
+computer to the same Wi-Fi. Metro's host address also lets the phone app reach
+the local backend on port 8000.
+
+For tunneling, run `npx expo start --go --tunnel`; the phone also needs a
+publicly reachable backend URL via `EXPO_PUBLIC_API_URL`. When building the web
+prototype for Vercel, set `EXPO_PUBLIC_EXPO_GO_URL` to the active Expo Go URL
+so the deployed QR points to the development server. See
+`mobile/.env.example` for the backend URL setting.
 
 ## API
 
