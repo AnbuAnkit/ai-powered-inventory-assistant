@@ -14,21 +14,34 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from datetime import date
 from typing import Literal
 
 import httpx
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
+from . import dataset
 from . import llm
 from .config import settings
 
 logger = logging.getLogger("inventory_assistant.api")
 
-app = FastAPI(title="AI Powered Inventory Assistant API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    count = dataset.initialize_database(settings.database_path, settings.dataset_path)
+    logger.info("Imported %d sales rows into %s", count, settings.database_path)
+    yield
+
+
+app = FastAPI(
+    title="AI Powered Inventory Assistant API", version="0.1.0", lifespan=lifespan
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -99,6 +112,62 @@ async def health() -> dict[str, object]:
             "models": models,
         },
     }
+
+
+def _sales_filters(
+    region: str | None,
+    category: str | None,
+    product: str | None,
+    salesperson: str | None,
+    start_date: date | None,
+    end_date: date | None,
+) -> dict[str, object]:
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise HTTPException(
+            status_code=422, detail="start_date must not be after end_date"
+        )
+    return {
+        "region": region,
+        "category": category,
+        "product": product,
+        "salesperson": salesperson,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+
+@app.get("/api/datasets/sales")
+def sales_records(
+    region: str | None = Query(default=None, min_length=1, max_length=100),
+    category: str | None = Query(default=None, min_length=1, max_length=100),
+    product: str | None = Query(default=None, min_length=1, max_length=100),
+    salesperson: str | None = Query(default=None, min_length=1, max_length=100),
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    filters = _sales_filters(
+        region, category, product, salesperson, start_date, end_date
+    )
+    return dataset.query_sales(
+        settings.database_path, **filters, limit=limit, offset=offset
+    )
+
+
+@app.get("/api/datasets/sales/summary")
+def sales_summary(
+    region: str | None = Query(default=None, min_length=1, max_length=100),
+    category: str | None = Query(default=None, min_length=1, max_length=100),
+    product: str | None = Query(default=None, min_length=1, max_length=100),
+    salesperson: str | None = Query(default=None, min_length=1, max_length=100),
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> dict[str, object]:
+    filters = _sales_filters(
+        region, category, product, salesperson, start_date, end_date
+    )
+    return dataset.summarize_sales(settings.database_path, **filters)
 
 
 @app.post("/api/chat/stream")

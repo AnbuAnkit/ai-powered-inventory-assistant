@@ -1,10 +1,13 @@
 import json
 from collections.abc import AsyncIterator
+from dataclasses import replace
+from datetime import date
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from ai_powered_inventory_assistant import api, llm
+from ai_powered_inventory_assistant import api, dataset, llm
 
 
 @pytest.fixture()
@@ -162,5 +165,63 @@ def test_rejects_conversation_not_ending_with_user(client: TestClient) -> None:
 
 def test_rejects_empty_messages(client: TestClient) -> None:
     response = client.post("/api/chat", json={"messages": []})
+
+    assert response.status_code == 422
+
+
+def test_dataset_import_and_filtered_queries(tmp_path: Path) -> None:
+    database_path = tmp_path / "sales.sqlite3"
+    workbook_path = (
+        Path(__file__).resolve().parents[1]
+        / "datasets"
+        / "excel_sales_dataset_600_rows.xlsx"
+    )
+
+    assert dataset.initialize_database(database_path, workbook_path) == 600
+
+    result = dataset.query_sales(
+        database_path, region="west", limit=2, start_date=date(2024, 1, 1)
+    )
+    assert result["total"] > 0
+    assert len(result["rows"]) == 2
+    assert all(row["region"] == "West" for row in result["rows"])
+    assert "date" in result["rows"][0]
+
+
+def test_sales_endpoints_return_rows_and_summary(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = Path(__file__).resolve().parents[1] / "datasets" / "excel_sales_dataset_600_rows.xlsx"
+    monkeypatch.setattr(
+        api,
+        "settings",
+        replace(
+            api.settings,
+            database_path=tmp_path / "sales.sqlite3",
+            dataset_path=source,
+        ),
+    )
+
+    with TestClient(api.app) as dataset_client:
+        records = dataset_client.get(
+            "/api/datasets/sales", params={"region": "west", "limit": 2}
+        )
+        summary = dataset_client.get(
+            "/api/datasets/sales/summary", params={"region": "west"}
+        )
+
+    assert records.status_code == 200
+    assert records.json()["total"] > len(records.json()["rows"]) == 2
+    assert all(row["region"] == "West" for row in records.json()["rows"])
+    assert summary.status_code == 200
+    assert summary.json()["rows"] == records.json()["total"]
+    assert summary.json()["sales"] > 0
+
+
+def test_sales_endpoints_reject_inverted_date_range(client: TestClient) -> None:
+    response = client.get(
+        "/api/datasets/sales",
+        params={"start_date": "2024-12-31", "end_date": "2024-01-01"},
+    )
 
     assert response.status_code == 422

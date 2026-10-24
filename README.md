@@ -64,17 +64,30 @@ For a deployed backend set `EXPO_PUBLIC_API_URL` (see `mobile/.env.example`).
 | Method | Path               | Purpose                                              |
 | ------ | ------------------ | ---------------------------------------------------- |
 | GET    | `/api/health`      | Backend status, model name, Ollama reachability      |
+| GET    | `/api/datasets/sales` | Filtered, paginated sales records                    |
+| GET    | `/api/datasets/sales/summary` | Totals and region/category breakdowns       |
 | POST   | `/api/chat/stream` | SSE stream: `delta`, `done`, `error` events          |
 | POST   | `/api/chat`        | Single JSON reply; fallback for clients without streaming fetch |
 
 Both chat endpoints take `{"messages": [{"role": "user" | "assistant", "content": "..."}]}`
 and require the last message to be from the user.
 
+The API imports the `Sales_Data` sheet from the Excel workbook into
+`datasets/sales.sqlite3` whenever it starts. The database is regenerated from
+the workbook on startup. Query the data with optional `region`, `category`,
+`product`, `salesperson`, `start_date`, and `end_date` filters. The records
+endpoint also accepts `limit` (1-500, defaults to 50) and `offset`.
+
+```text
+GET /api/datasets/sales?region=West&category=Electronics&limit=20
+GET /api/datasets/sales/summary?start_date=2024-01-01&end_date=2024-12-31
+```
+
 ## Configuration
 
 See `.env.example` for all backend settings (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`,
-`SYSTEM_PROMPT`, CORS, history window, timeout). Client-side overrides live in
-`mobile/.env.example`.
+`SYSTEM_PROMPT`, `DATASET_PATH`, `DATABASE_PATH`, CORS, history window, timeout).
+Client-side overrides live in `mobile/.env.example`.
 
 ## Tests
 
@@ -89,6 +102,3 @@ cd mobile && npm run typecheck
 - `mobile/src/hooks/useChat.ts` — conversation state, stop/retry
 - `mobile/src/components/` — UI building blocks (all platform-neutral)
 - `src/ai_powered_inventory_assistant/api.py` — endpoints and prompt assembly
-=======
-
->>>>>>> f8c08f82cb6ac2e4fdfece3280491b07d9387f21

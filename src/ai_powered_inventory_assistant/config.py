@@ -38,6 +38,15 @@ class Settings:
     ).rstrip("/")
     model: str = os.getenv("OLLAMA_MODEL", "llama3.2")
     system_prompt: str = os.getenv("SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT)
+    dataset_path: Path = Path(
+        os.getenv(
+            "DATASET_PATH",
+            str(PROJECT_ROOT / "datasets" / "excel_sales_dataset_600_rows.xlsx"),
+        )
+    )
+    database_path: Path = Path(
+        os.getenv("DATABASE_PATH", str(PROJECT_ROOT / "datasets" / "sales.sqlite3"))
+    )
 
     # How much conversation history to forward to the model.
     max_history_messages: int = int(os.getenv("MAX_HISTORY_MESSAGES", "24"))
