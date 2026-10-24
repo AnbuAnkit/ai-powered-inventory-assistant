@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI Powered Inventory Assistant
 
 A ChatGPT-style chat interface for an inventory assistant. The React UI runs on
@@ -88,3 +89,6 @@ cd mobile && npm run typecheck
 - `mobile/src/hooks/useChat.ts` — conversation state, stop/retry
 - `mobile/src/components/` — UI building blocks (all platform-neutral)
 - `src/ai_powered_inventory_assistant/api.py` — endpoints and prompt assembly
+=======
+
+>>>>>>> f8c08f82cb6ac2e4fdfece3280491b07d9387f21
