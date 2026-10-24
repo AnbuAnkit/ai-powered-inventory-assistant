@@ -1,14 +1,14 @@
 import asyncio
 import json
+import sqlite3
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
 
 from ai_powered_inventory_assistant import api, dataset, llm
 
@@ -48,14 +48,21 @@ def test_stream_chat_uses_google_chat_model(
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
     captured_options: dict[str, object] = {}
     captured_messages: list[BaseMessage] = []
+    captured_tools: list[str] = []
 
     class FakeGoogleChat:
         def __init__(self, **kwargs: object) -> None:
             captured_options.update(kwargs)
 
-        async def astream(self, messages: list[BaseMessage]) -> AsyncIterator[object]:
+        def bind_tools(self, tools: list[object]) -> object:
+            captured_tools.extend(tool.name for tool in tools)
+            return self
+
+        async def astream(
+            self, messages: list[BaseMessage]
+        ) -> AsyncIterator[AIMessageChunk]:
             captured_messages.extend(messages)
-            yield SimpleNamespace(content="Hello")
+            yield AIMessageChunk(content="Hello")
 
     monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", FakeGoogleChat)
 
@@ -77,6 +84,75 @@ def test_stream_chat_uses_google_chat_model(
         "system",
         "human",
     ]
+    assert "search_sales" in captured_tools
+    assert "rank_products_by_profit" in captured_tools
+    assert "update_inventory_item" in captured_tools
+
+
+def test_stream_chat_executes_inventory_tool(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    database_path = tmp_path / "sales.sqlite3"
+    workbook_path = (
+        Path(__file__).resolve().parents[1]
+        / "datasets"
+        / "excel_sales_dataset_600_rows.xlsx"
+    )
+    dataset.initialize_database(database_path, workbook_path)
+    captured_messages: list[BaseMessage] = []
+
+    class FakeGoogleChat:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def bind_tools(self, tools: list[object]) -> object:
+            return self
+
+        async def astream(
+            self, messages: list[BaseMessage]
+        ) -> AsyncIterator[AIMessageChunk]:
+            captured_messages.extend(messages)
+            if not any(isinstance(message, ToolMessage) for message in messages):
+                yield AIMessageChunk(
+                    content="",
+                    tool_call_chunks=[
+                        {
+                            "name": "add_inventory_item",
+                            "args": json.dumps(
+                                {
+                                    "product": "Widget",
+                                    "stock_quantity": 12,
+                                    "supplier": "Acme",
+                                    "reorder_point": 4,
+                                }
+                            ),
+                            "id": "call-add",
+                            "index": 0,
+                        }
+                    ],
+                )
+                return
+            yield AIMessageChunk(content="Added Widget with 12 units.")
+
+    monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", FakeGoogleChat)
+
+    async def collect() -> list[str]:
+        return [
+            delta
+            async for delta in llm.stream_chat(
+                [{"role": "user", "content": "Add Widget, 12 units"}],
+                settings=replace(api.settings, database_path=database_path),
+            )
+        ]
+
+    assert asyncio.run(collect()) == ["Added Widget with 12 units."]
+    assert any(isinstance(message, ToolMessage) for message in captured_messages)
+    item = dataset.list_inventory_items(database_path)[0]
+    assert item["product"] == "Widget"
+    assert item["stock_quantity"] == 12
+    assert item["supplier"] == "Acme"
+    assert item["reorder_point"] == 4
 
 
 def test_stream_chat_requires_google_api_key(
@@ -157,7 +233,9 @@ def test_prompt_includes_system_message_and_history_trimming(
     client.post("/api/chat/stream", json={"messages": messages})
 
     prompt = captured[0]
-    assert prompt[0] == {"role": "system", "content": api.settings.system_prompt}
+    assert prompt[0]["role"] == "system"
+    assert prompt[0]["content"].startswith(api.settings.system_prompt)
+    assert "Sales records are read-only" in prompt[0]["content"]
     assert prompt[-1] == {"role": "user", "content": "latest"}
     assert len(prompt) == api.settings.max_history_messages + 1
 
@@ -215,6 +293,67 @@ def test_dataset_import_and_filtered_queries(tmp_path: Path) -> None:
     assert len(result["rows"]) == 2
     assert all(row["region"] == "West" for row in result["rows"])
     assert "date" in result["rows"][0]
+
+
+def test_products_are_ranked_by_total_sales_profit(tmp_path: Path) -> None:
+    database_path = tmp_path / "sales.sqlite3"
+    workbook_path = (
+        Path(__file__).resolve().parents[1]
+        / "datasets"
+        / "excel_sales_dataset_600_rows.xlsx"
+    )
+    dataset.initialize_database(database_path, workbook_path)
+
+    ranked = dataset.rank_products_by_profit(database_path, limit=5)
+    with sqlite3.connect(database_path) as connection:
+        expected = connection.execute(
+            """
+            SELECT product, SUM(profit) AS total_profit
+            FROM sales
+            GROUP BY product
+            ORDER BY total_profit DESC, product
+            LIMIT 5
+            """
+        ).fetchall()
+
+    assert [row["product"] for row in ranked] == [row[0] for row in expected]
+    assert [row["total_profit"] for row in ranked] == [row[1] for row in expected]
+    assert all(
+        ranked[index]["total_profit"] >= ranked[index + 1]["total_profit"]
+        for index in range(len(ranked) - 1)
+    )
+
+
+def test_inventory_changes_survive_sales_reimport(tmp_path: Path) -> None:
+    database_path = tmp_path / "sales.sqlite3"
+    workbook_path = (
+        Path(__file__).resolve().parents[1]
+        / "datasets"
+        / "excel_sales_dataset_600_rows.xlsx"
+    )
+
+    dataset.initialize_database(database_path, workbook_path)
+    dataset.add_inventory_item(
+        database_path,
+        product="Widget",
+        stock_quantity=12,
+        supplier="Acme",
+        reorder_point=4,
+    )
+    dataset.update_inventory_item(
+        database_path, product="widget", stock_quantity=9
+    )
+
+    dataset.initialize_database(database_path, workbook_path)
+
+    item = dataset.list_inventory_items(database_path)[0]
+    assert item["product"] == "Widget"
+    assert item["stock_quantity"] == 9
+    assert item["supplier"] == "Acme"
+    assert item["reorder_point"] == 4
+
+    assert dataset.delete_inventory_item(database_path, product="WIDGET")
+    assert dataset.list_inventory_items(database_path) == []
 
 
 def test_sales_endpoints_return_rows_and_summary(

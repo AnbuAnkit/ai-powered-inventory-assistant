@@ -29,6 +29,16 @@ from . import llm
 from .config import settings
 
 logger = logging.getLogger("inventory_assistant.api")
+DATABASE_AGENT_POLICY = (
+    "Use the database tools for questions about actual sales or inventory data. "
+    "For questions about the most or highest-profit product, use "
+    "rank_products_by_profit, which aggregates the sales table; do not use "
+    "inventory tools for sales-profit rankings. The sales dataset has no unit "
+    "price field, so do not invent or infer actual prices. Sales records are "
+    "read-only. Only add, update, or delete inventory items when the user "
+    "explicitly requests that change. Never claim a database change succeeded "
+    "unless the tool confirms it."
+)
 
 
 @asynccontextmanager
@@ -72,7 +82,13 @@ def _build_prompt(messages: list[ChatMessage]) -> list[dict[str, str]]:
     history = [message.model_dump() for message in messages][
         -settings.max_history_messages :
     ]
-    return [{"role": "system", "content": settings.system_prompt}, *history]
+    return [
+        {
+            "role": "system",
+            "content": f"{settings.system_prompt}\n\n{DATABASE_AGENT_POLICY}",
+        },
+        *history,
+    ]
 
 
 def _sse(payload: dict[str, object]) -> str:

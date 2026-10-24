@@ -117,6 +117,18 @@ def initialize_database(database_path: Path, workbook_path: Path) -> int:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_sales_category ON sales(category)"
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS inventory_items (
+                item_id INTEGER PRIMARY KEY,
+                product TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                stock_quantity INTEGER NOT NULL CHECK (stock_quantity >= 0),
+                supplier TEXT NOT NULL DEFAULT '',
+                reorder_point INTEGER NOT NULL DEFAULT 0 CHECK (reorder_point >= 0),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
         with connection:
             connection.execute("DELETE FROM sales")
             connection.executemany(
@@ -129,6 +141,135 @@ def initialize_database(database_path: Path, workbook_path: Path) -> int:
                 records,
             )
     return len(records)
+
+
+def list_inventory_items(
+    database_path: Path, *, product: str | None = None, limit: int = 100
+) -> list[dict[str, Any]]:
+    """Return inventory items, optionally matching a product name."""
+    query = """
+        SELECT product, stock_quantity, supplier, reorder_point, updated_at
+        FROM inventory_items
+    """
+    parameters: list[Any] = []
+    if product is not None:
+        query += " WHERE product LIKE ? COLLATE NOCASE"
+        parameters.append(f"%{product}%")
+    query += " ORDER BY product LIMIT ?"
+    parameters.append(limit)
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(query, parameters).fetchall()
+    return [dict(row) for row in rows]
+
+
+def add_inventory_item(
+    database_path: Path,
+    *,
+    product: str,
+    stock_quantity: int,
+    supplier: str = "",
+    reorder_point: int = 0,
+) -> dict[str, Any]:
+    """Create an inventory item and return the stored row."""
+    product = product.strip()
+    if not product:
+        raise ValueError("product must not be empty")
+    if stock_quantity < 0 or reorder_point < 0:
+        raise ValueError("stock_quantity and reorder_point must not be negative")
+    with closing(sqlite3.connect(database_path)) as connection:
+        with connection:
+            connection.execute(
+                """
+                INSERT INTO inventory_items (
+                    product, stock_quantity, supplier, reorder_point
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (product, stock_quantity, supplier.strip(), reorder_point),
+            )
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            """
+            SELECT product, stock_quantity, supplier, reorder_point, updated_at
+            FROM inventory_items WHERE product = ? COLLATE NOCASE
+            """,
+            (product,),
+        ).fetchone()
+    if row is None:
+        raise RuntimeError("Inserted inventory item could not be read back")
+    return dict(row)
+
+
+def update_inventory_item(
+    database_path: Path,
+    *,
+    product: str,
+    stock_quantity: int | None = None,
+    supplier: str | None = None,
+    reorder_point: int | None = None,
+) -> dict[str, Any]:
+    """Update provided fields on an existing inventory item."""
+    updates: list[str] = []
+    values: list[Any] = []
+    if stock_quantity is not None:
+        if stock_quantity < 0:
+            raise ValueError("stock_quantity must not be negative")
+        updates.append("stock_quantity = ?")
+        values.append(stock_quantity)
+    if supplier is not None:
+        updates.append("supplier = ?")
+        values.append(supplier.strip())
+    if reorder_point is not None:
+        if reorder_point < 0:
+            raise ValueError("reorder_point must not be negative")
+        updates.append("reorder_point = ?")
+        values.append(reorder_point)
+    if not updates:
+        raise ValueError("At least one inventory field must be provided")
+
+    product = product.strip()
+    if not product:
+        raise ValueError("product must not be empty")
+    values.append(product)
+    with closing(sqlite3.connect(database_path)) as connection:
+        with connection:
+            cursor = connection.execute(
+                f"""
+                UPDATE inventory_items
+                SET {", ".join(updates)}, updated_at = CURRENT_TIMESTAMP
+                WHERE product = ? COLLATE NOCASE
+                """,
+                values,
+            )
+            if cursor.rowcount == 0:
+                raise ValueError(f"No inventory item found for product '{product}'")
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            """
+            SELECT product, stock_quantity, supplier, reorder_point, updated_at
+            FROM inventory_items WHERE product = ? COLLATE NOCASE
+            """,
+            (product,),
+        ).fetchone()
+    if row is None:
+        raise RuntimeError("Updated inventory item could not be read back")
+    return dict(row)
+
+
+def delete_inventory_item(database_path: Path, *, product: str) -> bool:
+    """Delete an inventory item by product name."""
+    product = product.strip()
+    if not product:
+        raise ValueError("product must not be empty")
+    with closing(sqlite3.connect(database_path)) as connection:
+        with connection:
+            cursor = connection.execute(
+                "DELETE FROM inventory_items WHERE product = ? COLLATE NOCASE",
+                (product,),
+            )
+    if cursor.rowcount == 0:
+        raise ValueError(f"No inventory item found for product '{product}'")
+    return True
 
 
 def _filters(
@@ -248,3 +389,38 @@ def summarize_sales(
         "profit": totals[3],
         **breakdowns,
     }
+
+
+def rank_products_by_profit(
+    database_path: Path,
+    *,
+    region: str | None = None,
+    category: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Rank products by summed sales profit, highest first."""
+    if not 1 <= limit <= 100:
+        raise ValueError("limit must be between 1 and 100")
+    where, parameters = _filters(
+        region, category, None, None, start_date, end_date
+    )
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """
+            SELECT product, SUM(profit) AS total_profit,
+                   SUM(sales) AS total_sales, SUM(quantity) AS total_quantity,
+                   COUNT(*) AS transaction_count
+            FROM sales
+            """
+            + where
+            + """
+            GROUP BY product
+            ORDER BY total_profit DESC, product
+            LIMIT ?
+            """,
+            [*parameters, limit],
+        ).fetchall()
+    return [dict(row) for row in rows]

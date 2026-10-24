@@ -72,10 +72,19 @@ Both chat endpoints take `{"messages": [{"role": "user" | "assistant", "content"
 and require the last message to be from the user.
 
 The API imports the `Sales_Data` sheet from the Excel workbook into
-`datasets/sales.sqlite3` whenever it starts. The database is regenerated from
-the workbook on startup. Query the data with optional `region`, `category`,
+`datasets/sales.sqlite3` whenever it starts. The `sales` table is regenerated
+from the workbook on startup. Query the data with optional `region`, `category`,
 `product`, `salesperson`, `start_date`, and `end_date` filters. The records
 endpoint also accepts `limit` (1-500, defaults to 50) and `offset`.
+
+The chat agent can use backend tools to search and summarize sales data and to
+list, add, update, or delete inventory items in the persistent `inventory_items`
+table. Inventory rows are not overwritten when sales are reimported. The model
+does not execute arbitrary SQL: sales tools are read-only, and inventory writes
+are limited to validated fields (`product`, `stock_quantity`, `supplier`, and
+`reorder_point`).
+For profit-ranking questions, it aggregates profit by product from the `sales`
+table. The workbook contains sales and profit, but no unit-price field.
 
 ```text
 GET /api/datasets/sales?region=West&category=Electronics&limit=20
