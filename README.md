@@ -3,17 +3,17 @@
 
 A ChatGPT-style chat interface for an inventory assistant. The React UI runs on
 web, iOS and Android from one codebase (Expo + React Native Web); a small
-FastAPI backend streams replies from a local LLM through Ollama so no API key or
-model logic ever reaches the client.
+FastAPI backend streams replies from Google's Gemini API through LangChain.
+Google credentials stay on the backend and never reach the client.
 
 ```
 mobile/  (Expo app: web + iOS + Android)
    │  POST /api/chat/stream  (SSE tokens)
    ▼
-src/ai_powered_inventory_assistant/  (FastAPI)
-   │  POST /api/chat  (NDJSON stream)
+src/ai_powered_inventory_assistant/  (FastAPI + LangChain)
+   │  Gemini API request
    ▼
-Ollama on http://localhost:11434
+Google Gemini API
 ```
 
 ## Features
@@ -28,16 +28,15 @@ Ollama on http://localhost:11434
 
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/)
 - Node.js 20+
-- [Ollama](https://ollama.com/download) with a model pulled: `ollama pull llama3.2`
+- A Google AI Studio API key and a model available through the Gemini API
 
 ## Run it
 
 ```bash
-# 1. Terminal: start the model server
-ollama serve
+# 1. Terminal: configure GOOGLE_API_KEY in .env
+cp .env.example .env
 
-# 2. Terminal: start the API (installs Python deps on first run)
-cp .env.example .env      # optional, defaults work out of the box
+# 2. Terminal: start the API
 uv sync
 uv run inventory-api      # http://localhost:8000  (docs at /docs)
 
@@ -63,7 +62,7 @@ For a deployed backend set `EXPO_PUBLIC_API_URL` (see `mobile/.env.example`).
 
 | Method | Path               | Purpose                                              |
 | ------ | ------------------ | ---------------------------------------------------- |
-| GET    | `/api/health`      | Backend status, model name, Ollama reachability      |
+| GET    | `/api/health`      | Backend status and configured model                  |
 | GET    | `/api/datasets/sales` | Filtered, paginated sales records                    |
 | GET    | `/api/datasets/sales/summary` | Totals and region/category breakdowns       |
 | POST   | `/api/chat/stream` | SSE stream: `delta`, `done`, `error` events          |
@@ -85,7 +84,7 @@ GET /api/datasets/sales/summary?start_date=2024-01-01&end_date=2024-12-31
 
 ## Configuration
 
-See `.env.example` for all backend settings (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`,
+See `.env.example` for all backend settings (`GOOGLE_API_KEY`, `GOOGLE_MODEL`,
 `SYSTEM_PROMPT`, `DATASET_PATH`, `DATABASE_PATH`, CORS, history window, timeout).
 Client-side overrides live in `mobile/.env.example`.
 
@@ -98,7 +97,7 @@ cd mobile && npm run typecheck
 
 ## Where to extend
 
-- `mobile/src/api/chat.ts` — transport (swap Ollama for another provider's API here)
+- `src/ai_powered_inventory_assistant/llm.py` — LangChain Google model integration
 - `mobile/src/hooks/useChat.ts` — conversation state, stop/retry
 - `mobile/src/components/` — UI building blocks (all platform-neutral)
 - `src/ai_powered_inventory_assistant/api.py` — endpoints and prompt assembly

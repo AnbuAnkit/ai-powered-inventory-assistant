@@ -27,8 +27,8 @@ export function EmptyState({ theme, onPick }: Props) {
 
       <Text style={[styles.title, { color: theme.text }]}>How can I help with your inventory?</Text>
       <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-        Ask about stock levels, suppliers, reorder points or sales. The model runs on your
-        machine through Ollama.
+        Ask about stock levels, suppliers, reorder points or sales. The model is accessed
+        through Google's Gemini API.
       </Text>
 
       <View style={styles.suggestions}>

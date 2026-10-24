@@ -1,7 +1,7 @@
 """Runtime configuration for the chat API.
 
 Every setting can be overridden with an environment variable (or a `.env`
-file at the project root). Defaults target a local Ollama install.
+file at the project root). Defaults target Google's Gemini API.
 """
 
 from __future__ import annotations
@@ -33,10 +33,7 @@ class Settings:
     host: str = os.getenv("API_HOST", "0.0.0.0")
     port: int = int(os.getenv("API_PORT", "8000"))
 
-    ollama_base_url: str = os.getenv(
-        "OLLAMA_BASE_URL", "http://localhost:11434"
-    ).rstrip("/")
-    model: str = os.getenv("OLLAMA_MODEL", "llama3.2")
+    model: str = os.getenv("GOOGLE_MODEL", "gemini-4-argon")
     system_prompt: str = os.getenv("SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT)
     dataset_path: Path = Path(
         os.getenv(

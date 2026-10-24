@@ -18,7 +18,7 @@ export function useBackendStatus(): BackendStatus {
       .then((report) => {
         if (controller.signal.aborted) return;
         setStatus({
-          state: report.ollamaReachable ? 'online' : 'offline',
+          state: 'online',
           model: report.model,
         });
       })

@@ -6,7 +6,7 @@ POST /api/chat/stream  -> text/event-stream of JSON events:
                           {"type": "error", "message": "..."}
 POST /api/chat         -> single JSON reply (fallback for clients without
                           streaming fetch support, e.g. React Native's fetch)
-GET  /api/health       -> backend + Ollama status
+GET  /api/health       -> backend status and configured model
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from contextlib import asynccontextmanager
 from datetime import date
 from typing import Literal
 
-import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -95,22 +94,10 @@ async def _event_stream(prompt: list[dict[str, str]]) -> AsyncIterator[str]:
 
 @app.get("/api/health")
 async def health() -> dict[str, object]:
-    """Best-effort status probe, used by the UI to show the connection badge."""
-    models: list[str] = []
-    reachable = False
-    try:
-        models = await llm.list_models()
-        reachable = True
-    except (httpx.HTTPError, OSError, ValueError):
-        pass
+    """Report backend availability for the UI connection badge."""
     return {
         "status": "ok",
         "model": settings.model,
-        "ollama": {
-            "base_url": settings.ollama_base_url,
-            "reachable": reachable,
-            "models": models,
-        },
     }
 
 

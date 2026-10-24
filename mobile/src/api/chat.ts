@@ -14,8 +14,6 @@ export interface ChatMessage {
 
 export interface HealthReport {
   model: string;
-  ollamaReachable: boolean;
-  models: string[];
 }
 
 const CONFIGURED_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, '');
@@ -114,8 +112,8 @@ interface SendOptions {
 /**
  * Send the conversation and stream the reply token by token.
  *
- * The backend owns the API key and talks to Ollama, so the client only ever
- * sees text deltas over SSE. If the runtime cannot stream response bodies we
+ * The backend owns the API key and talks to Google's Gemini API, so the client
+ * only ever sees text deltas over SSE. If the runtime cannot stream response bodies we
  * fall back to the buffered endpoint so a reply still arrives.
  */
 export async function sendChatMessage({
@@ -228,11 +226,8 @@ export async function fetchHealth(signal?: AbortSignal): Promise<HealthReport> {
   if (!response.ok) throw await toApiError(response);
   const data = (await response.json()) as {
     model: string;
-    ollama: { reachable: boolean; models: string[] };
   };
   return {
     model: data.model,
-    ollamaReachable: data.ollama.reachable,
-    models: data.ollama.models ?? [],
   };
 }

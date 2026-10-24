@@ -1,11 +1,14 @@
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
+from langchain_core.messages import BaseMessage
 
 from ai_powered_inventory_assistant import api, dataset, llm
 
@@ -29,38 +32,64 @@ async def _fake_stream(deltas: list[str]) -> AsyncIterator[str]:
         yield delta
 
 
-def test_health_reports_ollama_state(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_models(*args, **kwargs) -> list[str]:
-        return ["llama3.2:latest"]
-
-    monkeypatch.setattr(llm, "list_models", fake_models)
-
+def test_health_reports_backend_and_configured_model(client: TestClient) -> None:
     response = client.get("/api/health")
 
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
         "model": api.settings.model,
-        "ollama": {
-            "base_url": api.settings.ollama_base_url,
-            "reachable": True,
-            "models": ["llama3.2:latest"],
-        },
     }
 
 
-def test_health_survives_unreachable_ollama(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+def test_stream_chat_uses_google_chat_model(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def boom(*args, **kwargs) -> list[str]:
-        raise OSError("connection refused")
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    captured_options: dict[str, object] = {}
+    captured_messages: list[BaseMessage] = []
 
-    monkeypatch.setattr(llm, "list_models", boom)
+    class FakeGoogleChat:
+        def __init__(self, **kwargs: object) -> None:
+            captured_options.update(kwargs)
 
-    response = client.get("/api/health")
+        async def astream(self, messages: list[BaseMessage]) -> AsyncIterator[object]:
+            captured_messages.extend(messages)
+            yield SimpleNamespace(content="Hello")
 
-    assert response.status_code == 200
-    assert response.json()["ollama"]["reachable"] is False
+    monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", FakeGoogleChat)
+
+    async def collect() -> list[str]:
+        return [
+            delta
+            async for delta in llm.stream_chat(
+                [
+                    {"role": "system", "content": "Be concise"},
+                    {"role": "user", "content": "Hi"},
+                ],
+                settings=replace(api.settings, model="gemini-test"),
+            )
+        ]
+
+    assert asyncio.run(collect()) == ["Hello"]
+    assert captured_options["model"] == "gemini-test"
+    assert [message.type for message in captured_messages] == [
+        "system",
+        "human",
+    ]
+
+
+def test_stream_chat_requires_google_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    async def collect() -> list[str]:
+        return [delta async for delta in llm.stream_chat([{"role": "user", "content": "Hi"}])]
+
+    with pytest.raises(llm.LLMError, match="GOOGLE_API_KEY"):
+        asyncio.run(collect())
 
 
 def test_stream_returns_deltas_then_done(
@@ -90,7 +119,7 @@ def test_stream_returns_deltas_then_done(
 def test_stream_sends_error_event(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     async def failing_stream(*args, **kwargs) -> AsyncIterator[str]:
         yield "partial"
-        raise llm.LLMError("Model 'llama3.2' is not available on Ollama.")
+        raise llm.LLMError("Google Gemini call failed: model is unavailable")
 
     monkeypatch.setattr(llm, "stream_chat", failing_stream)
 
@@ -103,7 +132,7 @@ def test_stream_sends_error_event(client: TestClient, monkeypatch: pytest.Monkey
     assert events[0] == {"type": "delta", "text": "partial"}
     assert events[1] == {
         "type": "error",
-        "message": "Model 'llama3.2' is not available on Ollama.",
+        "message": "Google Gemini call failed: model is unavailable",
     }
     assert not any(event["type"] == "done" for event in events)
 
