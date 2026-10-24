@@ -7,12 +7,19 @@ file at the project root). Defaults target Google's Gemini API.
 from __future__ import annotations
 
 import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = PACKAGE_ROOT.parent
+PROJECT_ROOT = (
+    REPOSITORY_ROOT
+    if (REPOSITORY_ROOT / "datasets" / "excel_sales_dataset_600_rows.xlsx").is_file()
+    else PACKAGE_ROOT
+)
 load_dotenv(PROJECT_ROOT / ".env")
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -42,7 +49,14 @@ class Settings:
         )
     )
     database_path: Path = Path(
-        os.getenv("DATABASE_PATH", str(PROJECT_ROOT / "datasets" / "sales.sqlite3"))
+        os.getenv(
+            "DATABASE_PATH",
+            str(
+                Path(tempfile.gettempdir()) / "inventory-assistant.sqlite3"
+                if os.getenv("VERCEL")
+                else PROJECT_ROOT / "datasets" / "sales.sqlite3"
+            ),
+        )
     )
 
     # How much conversation history to forward to the model.

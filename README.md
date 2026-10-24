@@ -66,6 +66,20 @@ prototype for Vercel, set `EXPO_PUBLIC_EXPO_GO_URL` to the active Expo Go URL
 so the deployed QR points to the development server. See
 `mobile/.env.example` for the backend URL setting.
 
+### Deploy the backend to Vercel
+
+Create a separate Vercel project for the backend and set its Root Directory to
+`src`. The backend Vercel configuration, Python version, dependencies, FastAPI
+entrypoint, and required sales workbook are included in that directory. Leave
+the Build Command unset; `uv run inventory-api` is for local development, not
+the Vercel function build. Set `GOOGLE_API_KEY` in the backend project's
+environment variables.
+
+On Vercel, SQLite is stored under `/tmp` and is not durable. Inventory changes
+can be lost when a serverless instance is recycled. Use a persistent hosted
+database before relying on writes. The API also has no authentication yet, so
+do not expose its inventory write tools publicly until access control is added.
+
 ## API
 
 | Method | Path               | Purpose                                              |
@@ -86,8 +100,8 @@ from the workbook on startup. Query the data with optional `region`, `category`,
 endpoint also accepts `limit` (1-500, defaults to 50) and `offset`.
 
 The chat agent can use backend tools to search and summarize sales data and to
-list, add, update, or delete inventory items in the persistent `inventory_items`
-table. Inventory rows are not overwritten when sales are reimported. The model
+list, add, update, or delete inventory items in the `inventory_items` table.
+Inventory rows are not overwritten when sales are reimported. The model
 does not execute arbitrary SQL: sales tools are read-only, and inventory writes
 are limited to validated fields (`product`, `stock_quantity`, `supplier`, and
 `reorder_point`).
