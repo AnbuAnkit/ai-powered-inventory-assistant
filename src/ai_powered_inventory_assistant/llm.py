@@ -73,7 +73,7 @@ async def stream_chat(
     try:
         model = ChatGoogleGenerativeAI(
             model=cfg.model,
-            temperature=0,
+            # temperature=0,
             request_timeout=cfg.request_timeout,
             thinking_level="low",
         )
