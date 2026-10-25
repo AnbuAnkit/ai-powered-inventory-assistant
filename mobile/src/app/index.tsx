@@ -1,135 +1,70 @@
-import { useCallback, useEffect, useRef } from 'react';
-import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { ChatMessage } from '@/api/chat';
-import { ChatHeader } from '@/components/ChatHeader';
-import { Composer } from '@/components/Composer';
-import { EmptyState } from '@/components/EmptyState';
-import { MessageBubble } from '@/components/MessageBubble';
-import { useBackendStatus } from '@/hooks/useBackendStatus';
-import { useChat } from '@/hooks/useChat';
-import { layout, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 
-export default function ChatScreen() {
+export default function LandingScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const backend = useBackendStatus();
-  const { messages, isStreaming, canRetry, send, stop, retry, reset } = useChat();
-
-  const listRef = useRef<FlatList<ChatMessage>>(null);
-  const hasMessages = messages.length > 0;
-
-  const scrollToEnd = useCallback(() => {
-    listRef.current?.scrollToEnd({ animated: true });
-  }, []);
-
-  useEffect(() => {
-    if (hasMessages) scrollToEnd();
-  }, [hasMessages, scrollToEnd]);
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <View
-        style={[
-          styles.column,
-          Platform.OS === 'web' && {
-            borderLeftWidth: StyleSheet.hairlineWidth,
-            borderRightWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.border,
-            maxWidth: layout.maxContentWidth,
-          },
-        ]}
-      >
-        <View style={{ paddingTop: insets.top }}>
-          <ChatHeader
-            theme={theme}
-            model={backend.model}
-            connection={backend.state}
-            onNewChat={reset}
-            newChatDisabled={!hasMessages || isStreaming}
-          />
+    <View
+      style={[
+        styles.screen,
+        {
+          backgroundColor: theme.background,
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
+        },
+      ]}
+    >
+      <View style={styles.content}>
+        <View style={[styles.mark, { backgroundColor: theme.surfaceMuted }]}>
+          <Text style={[styles.markLabel, { color: theme.accent }]}>KE</Text>
         </View>
+        <Text style={[styles.title, { color: theme.text }]}>Kavya Enterprise</Text>
+        <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+          Your AI-powered inventory assistant
+        </Text>
 
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <Pressable
+          onPress={() => router.push('/chat')}
+          accessibilityRole="button"
+          accessibilityLabel="Chat now"
+          style={({ pressed }) => [
+            styles.button,
+            { backgroundColor: theme.accent, opacity: pressed ? 0.85 : 1 },
+          ]}
         >
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(message) => message.id}
-            renderItem={({ item }) => (
-              <MessageBubble message={item} theme={theme} isStreaming={isStreaming} />
-            )}
-            ListEmptyComponent={<EmptyState theme={theme} onPick={send} />}
-            contentContainerStyle={[
-              styles.listContent,
-              { justifyContent: hasMessages ? 'flex-end' : 'center' },
-            ]}
-            onContentSizeChange={() => hasMessages && scrollToEnd()}
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-            keyboardShouldPersistTaps="handled"
-          />
-
-          {canRetry && (
-            <View style={styles.retryRow}>
-              <Pressable
-                onPress={retry}
-                accessibilityRole="button"
-                accessibilityLabel="Retry the last message"
-                style={({ pressed }) => [
-                  styles.retryButton,
-                  {
-                    borderColor: theme.border,
-                    backgroundColor: pressed ? theme.surfaceMuted : theme.surface,
-                  },
-                ]}
-              >
-                <Text style={[styles.retryLabel, { color: theme.text }]}>↻ Retry</Text>
-              </Pressable>
-            </View>
-          )}
-
-          <View style={{ paddingBottom: Math.max(insets.bottom, 10) }}>
-            <Composer
-              theme={theme}
-              isStreaming={isStreaming}
-              onSend={send}
-              onStop={stop}
-            />
-          </View>
-        </KeyboardAvoidingView>
+          <Text style={[styles.buttonLabel, { color: theme.onAccent }]}>chat now</Text>
+        </Pressable>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center' },
-  column: { flex: 1, width: '100%', alignSelf: 'center' },
-  flex: { flex: 1 },
-  listContent: {
-    flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: 16,
+  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  content: { width: '100%', maxWidth: 480, alignItems: 'center' },
+  mark: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
   },
-  retryRow: { alignItems: 'center', paddingBottom: 4 },
-  retryButton: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+  markLabel: { fontSize: 20, fontWeight: '800', letterSpacing: 1 },
+  title: { fontSize: 32, fontWeight: '800', textAlign: 'center' },
+  subtitle: { fontSize: 16, textAlign: 'center', marginTop: 10 },
+  button: {
+    minWidth: 180,
+    alignItems: 'center',
+    borderRadius: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 15,
+    marginTop: 32,
   },
-  retryLabel: { fontSize: 13, fontWeight: '600' },
+  buttonLabel: { fontSize: 16, fontWeight: '700', textTransform: 'capitalize' },
 });
