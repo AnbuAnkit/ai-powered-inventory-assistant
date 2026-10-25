@@ -66,6 +66,23 @@ prototype for Vercel, set `EXPO_PUBLIC_EXPO_GO_URL` to the active Expo Go URL
 so the deployed QR points to the development server. See
 `mobile/.env.example` for the backend URL setting.
 
+### Deploy the web prototype to Vercel
+
+1. Import this Git repository in Vercel and set the project **Root Directory**
+   to `mobile`. The Vercel build settings in `mobile/vercel.json` export the
+   Expo web app to `dist`.
+2. Add these Vercel environment variables for the Production environment:
+   - `EXPO_PUBLIC_EXPO_GO_URL`: the `exp://...` URL printed by
+     `npx expo start --go --tunnel`.
+   - `EXPO_PUBLIC_API_URL`: a public HTTPS URL for the FastAPI backend.
+3. Deploy or redeploy after setting the variables. The QR URL is embedded at
+   build time, so redeploy the web app if the Expo tunnel URL changes.
+
+Vercel hosts only the static web frontend here. It does not host the FastAPI
+backend or its SQLite database. For a live demo, keep the Expo tunnel and the
+backend reachable for the duration of the presentation; never put
+`GOOGLE_API_KEY` in a `EXPO_PUBLIC_*` variable.
+
 ### Deploy the backend to Vercel
 
 Create a separate Vercel project for the backend and set its Root Directory to
@@ -74,6 +91,11 @@ entrypoint, and required sales workbook are included in that directory. Leave
 the Build Command unset; `uv run inventory-api` is for local development, not
 the Vercel function build. Set `GOOGLE_API_KEY` in the backend project's
 environment variables.
+
+The repository pins Python 3.12 for Vercel; `pyproject.toml` still declares
+Python 3.11 as the minimum supported version for local development. The root
+`pyproject.toml` Vercel entrypoint is for deployments rooted at the repository
+root; keep the existing production backend project rooted at `src`.
 
 On Vercel, SQLite is stored under `/tmp` and is not durable. Inventory changes
 can be lost when a serverless instance is recycled. Use a persistent hosted

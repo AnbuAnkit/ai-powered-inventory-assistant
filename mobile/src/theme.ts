@@ -1,5 +1,3 @@
-import { useColorScheme } from 'react-native';
-
 export type Theme = {
   background: string;
   surface: string;
@@ -14,13 +12,13 @@ export type Theme = {
   online: string;
 };
 
-const light: Theme = {
-  background: '#f7f7f8',
+const theme: Theme = {
+  background: '#f8fafc',
   surface: '#ffffff',
-  surfaceMuted: '#eef0f3',
-  border: '#e3e5ea',
-  text: '#111827',
-  textMuted: '#6b7280',
+  surfaceMuted: '#eff6ff',
+  border: '#dbeafe',
+  text: '#0f172a',
+  textMuted: '#64748b',
   accent: '#2563eb',
   onAccent: '#ffffff',
   bubble: '#2563eb',
@@ -28,22 +26,8 @@ const light: Theme = {
   online: '#16a34a',
 };
 
-const dark: Theme = {
-  background: '#0f1115',
-  surface: '#171a21',
-  surfaceMuted: '#212734',
-  border: '#262b36',
-  text: '#f3f4f6',
-  textMuted: '#9ca3af',
-  accent: '#3b82f6',
-  onAccent: '#ffffff',
-  bubble: '#2563eb',
-  danger: '#f87171',
-  online: '#4ade80',
-};
-
 export function useTheme(): Theme {
-  return useColorScheme() === 'dark' ? dark : light;
+  return theme;
 }
 
 export const layout = {
