@@ -1,7 +1,7 @@
 """Runtime configuration for the chat API.
 
 Every setting can be overridden with an environment variable (or a `.env`
-file at the project root). Defaults target Google's Gemini API.
+file at the project root). Defaults target Groq's API.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ class Settings:
     host: str = os.getenv("API_HOST", "0.0.0.0")
     port: int = int(os.getenv("API_PORT", "8000"))
 
-    model: str = os.getenv("GOOGLE_MODEL", "gemini-4-argon")
+    model: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     system_prompt: str = os.getenv("SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT)
     dataset_path: Path = Path(
         os.getenv(

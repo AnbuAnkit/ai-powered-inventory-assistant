@@ -1,4 +1,4 @@
-"""Streaming chat client for Google's Gemini API via LangChain."""
+"""Streaming chat client for Groq via LangChain."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_google_genai._common import GoogleGenerativeAIError
+from groq import GroqError
+from langchain_groq import ChatGroq
 
 from .config import Settings, settings as default_settings
 from .database_tools import create_database_tools
@@ -64,18 +64,17 @@ async def stream_chat(
 ) -> AsyncIterator[str]:
     """Yield reply text after the model has used any required database tools."""
     cfg = settings or default_settings
-    if not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")):
+    if not os.getenv("GROQ_API_KEY"):
         raise LLMError(
-            "Google API credentials are missing. Set GOOGLE_API_KEY in the "
+            "Groq API credentials are missing. Set GROQ_API_KEY in the "
             "backend environment or project .env file."
         )
 
     try:
-        model = ChatGoogleGenerativeAI(
+        model = ChatGroq(
             model=cfg.model,
             temperature=0,
             request_timeout=cfg.request_timeout,
-            thinking_level="low",
         )
         tools = create_database_tools(cfg.database_path)
         tools_by_name = {item.name: item for item in tools}
@@ -115,5 +114,5 @@ async def stream_chat(
                     result = f"Tool error: {exc}"
                 conversation.append(ToolMessage(content=str(result), tool_call_id=tool_id))
         raise LLMError("The model exceeded the maximum number of database tool calls.")
-    except GoogleGenerativeAIError as exc:
-        raise LLMError(f"Google Gemini call failed: {exc}") from exc
+    except GroqError as exc:
+        raise LLMError(f"Groq call failed: {exc}") from exc
