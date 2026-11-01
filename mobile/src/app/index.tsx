@@ -21,9 +21,9 @@ export default function LandingScreen() {
     >
       <View style={styles.content}>
         <View style={[styles.mark, { backgroundColor: theme.surfaceMuted }]}>
-          <Text style={[styles.markLabel, { color: theme.accent }]}>KE</Text>
+          <Text style={[styles.markLabel, { color: theme.accent }]}>AI</Text>
         </View>
-        <Text style={[styles.title, { color: theme.text }]}>Kavya Enterprise</Text>
+        <Text style={[styles.title, { color: theme.text }]}>AI Inventory Assistant</Text>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>
           Your AI-powered inventory assistant
         </Text>

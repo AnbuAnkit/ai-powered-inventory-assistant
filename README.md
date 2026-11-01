@@ -3,17 +3,17 @@
 
 A ChatGPT-style chat interface for an inventory assistant. The React UI runs on
 web, iOS and Android from one codebase (Expo + React Native Web); a small
-FastAPI backend streams replies from Google's Gemini API through LangChain.
-Google credentials stay on the backend and never reach the client.
+FastAPI backend streams replies from Groq through LangChain.
+Groq credentials stay on the backend and never reach the client.
 
 ```
 mobile/  (Expo app: web + iOS + Android)
    │  POST /api/chat/stream  (SSE tokens)
    ▼
 src/ai_powered_inventory_assistant/  (FastAPI + LangChain)
-   │  Gemini API request
+   │  Groq API request
    ▼
-Google Gemini API
+Groq API
 ```
 
 ## Features
@@ -28,12 +28,12 @@ Google Gemini API
 
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/)
 - Node.js 20+
-- A Google AI Studio API key and a model available through the Gemini API
+- A Groq API key
 
 ## Run it
 
 ```bash
-# 1. Terminal: configure GOOGLE_API_KEY in .env
+# 1. Terminal: configure GROQ_API_KEY in .env
 cp .env.example .env
 
 # 2. Terminal: start the API
@@ -81,7 +81,7 @@ so the deployed QR points to the development server. See
 Vercel hosts only the static web frontend here. It does not host the FastAPI
 backend or its SQLite database. For a live demo, keep the Expo tunnel and the
 backend reachable for the duration of the presentation; never put
-`GOOGLE_API_KEY` in a `EXPO_PUBLIC_*` variable.
+`GROQ_API_KEY` in a `EXPO_PUBLIC_*` variable.
 
 ### Deploy the backend to Vercel
 
@@ -137,7 +137,7 @@ GET /api/datasets/sales/summary?start_date=2024-01-01&end_date=2024-12-31
 
 ## Configuration
 
-See `.env.example` for all backend settings (`GOOGLE_API_KEY`, `GOOGLE_MODEL`,
+See `.env.example` for all backend settings (`GROQ_API_KEY`, `GROQ_MODEL`,
 `SYSTEM_PROMPT`, `DATASET_PATH`, `DATABASE_PATH`, CORS, history window, timeout).
 Client-side overrides live in `mobile/.env.example`.
 
@@ -150,7 +150,7 @@ cd mobile && npm run typecheck
 
 ## Where to extend
 
-- `src/ai_powered_inventory_assistant/llm.py` — LangChain Google model integration
+- `src/ai_powered_inventory_assistant/llm.py` — LangChain Groq model integration
 - `mobile/src/hooks/useChat.ts` — conversation state, stop/retry
 - `mobile/src/components/` — UI building blocks (all platform-neutral)
 - `src/ai_powered_inventory_assistant/api.py` — endpoints and prompt assembly

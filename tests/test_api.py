@@ -42,15 +42,15 @@ def test_health_reports_backend_and_configured_model(client: TestClient) -> None
     }
 
 
-def test_stream_chat_uses_google_chat_model(
+def test_stream_chat_uses_groq_chat_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
     captured_options: dict[str, object] = {}
     captured_messages: list[BaseMessage] = []
     captured_tools: list[str] = []
 
-    class FakeGoogleChat:
+    class FakeGroqChat:
         def __init__(self, **kwargs: object) -> None:
             captured_options.update(kwargs)
 
@@ -64,7 +64,7 @@ def test_stream_chat_uses_google_chat_model(
             captured_messages.extend(messages)
             yield AIMessageChunk(content="Hello")
 
-    monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", FakeGoogleChat)
+    monkeypatch.setattr(llm, "ChatGroq", FakeGroqChat)
 
     async def collect() -> list[str]:
         return [
@@ -74,12 +74,12 @@ def test_stream_chat_uses_google_chat_model(
                     {"role": "system", "content": "Be concise"},
                     {"role": "user", "content": "Hi"},
                 ],
-                settings=replace(api.settings, model="gemini-test"),
+                settings=replace(api.settings, model="groq-test"),
             )
         ]
 
     assert asyncio.run(collect()) == ["Hello"]
-    assert captured_options["model"] == "gemini-test"
+    assert captured_options["model"] == "groq-test"
     assert [message.type for message in captured_messages] == [
         "system",
         "human",
@@ -92,7 +92,7 @@ def test_stream_chat_uses_google_chat_model(
 def test_stream_chat_executes_inventory_tool(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
     database_path = tmp_path / "sales.sqlite3"
     workbook_path = (
         Path(__file__).resolve().parents[1]
@@ -102,7 +102,7 @@ def test_stream_chat_executes_inventory_tool(
     dataset.initialize_database(database_path, workbook_path)
     captured_messages: list[BaseMessage] = []
 
-    class FakeGoogleChat:
+    class FakeGroqChat:
         def __init__(self, **kwargs: object) -> None:
             pass
 
@@ -135,7 +135,7 @@ def test_stream_chat_executes_inventory_tool(
                 return
             yield AIMessageChunk(content="Added Widget with 12 units.")
 
-    monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", FakeGoogleChat)
+    monkeypatch.setattr(llm, "ChatGroq", FakeGroqChat)
 
     async def collect() -> list[str]:
         return [
@@ -155,16 +155,15 @@ def test_stream_chat_executes_inventory_tool(
     assert item["reorder_point"] == 4
 
 
-def test_stream_chat_requires_google_api_key(
+def test_stream_chat_requires_groq_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     async def collect() -> list[str]:
         return [delta async for delta in llm.stream_chat([{"role": "user", "content": "Hi"}])]
 
-    with pytest.raises(llm.LLMError, match="GOOGLE_API_KEY"):
+    with pytest.raises(llm.LLMError, match="GROQ_API_KEY"):
         asyncio.run(collect())
 
 
@@ -195,7 +194,7 @@ def test_stream_returns_deltas_then_done(
 def test_stream_sends_error_event(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     async def failing_stream(*args, **kwargs) -> AsyncIterator[str]:
         yield "partial"
-        raise llm.LLMError("Google Gemini call failed: model is unavailable")
+        raise llm.LLMError("Groq call failed: model is unavailable")
 
     monkeypatch.setattr(llm, "stream_chat", failing_stream)
 
@@ -208,7 +207,7 @@ def test_stream_sends_error_event(client: TestClient, monkeypatch: pytest.Monkey
     assert events[0] == {"type": "delta", "text": "partial"}
     assert events[1] == {
         "type": "error",
-        "message": "Google Gemini call failed: model is unavailable",
+        "message": "Groq call failed: model is unavailable",
     }
     assert not any(event["type"] == "done" for event in events)
 
