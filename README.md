@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+Deployment: https://ai-powered-inventory-assistant-mobi.vercel.app/
 # AI Powered Inventory Assistant
 
 A ChatGPT-style chat interface for an inventory assistant. The React UI runs on
