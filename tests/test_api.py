@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
 
-from ai_powered_inventory_assistant import api, dataset, llm
+from ai_powered_inventory_assistant import aiml, api, dataset, llm
 
 
 @pytest.fixture()
@@ -200,7 +200,7 @@ def test_stream_sends_error_event(client: TestClient, monkeypatch: pytest.Monkey
 
     response = client.post(
         "/api/chat/stream",
-        json={"messages": [{"role": "user", "content": "hello"}]},
+        json={"messages": [{"role": "user", "content": "show me low stock"}]},
     )
 
     events = _event_payloads(response.text)
@@ -249,7 +249,7 @@ def test_buffered_chat_returns_full_reply(
     monkeypatch.setattr(llm, "stream_chat", fake_stream)
 
     response = client.post(
-        "/api/chat", json={"messages": [{"role": "user", "content": "hi"}]}
+        "/api/chat", json={"messages": [{"role": "user", "content": "summarize sales"}]}
     )
 
     assert response.status_code == 200
@@ -258,6 +258,42 @@ def test_buffered_chat_returns_full_reply(
         "reply": "hello there",
         "model": api.settings.model,
     }
+
+
+def test_aiml_matches_normalized_greetings_and_wildcards() -> None:
+    assert aiml.respond("  hELLo!!! ") == (
+        "Hello! How can I help with your inventory today?"
+    )
+    assert aiml.respond("HOW u doing?") == (
+        "I'm doing well, thanks for asking! How can I help with your inventory?"
+    )
+    assert aiml.respond("Can you summarize sales?") is None
+
+
+def test_greetings_bypass_llm_for_both_chat_endpoints(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        llm,
+        "stream_chat",
+        lambda *args, **kwargs: pytest.fail("greetings should not call the LLM"),
+    )
+    message = {"messages": [{"role": "user", "content": "Hello"}]}
+
+    buffered = client.post("/api/chat", json=message)
+    streamed = client.post("/api/chat/stream", json=message)
+
+    expected_reply = "Hello! How can I help with your inventory today?"
+    assert buffered.status_code == 200
+    assert buffered.json() == {
+        "ok": True,
+        "reply": expected_reply,
+        "model": aiml.MODEL_NAME,
+    }
+    assert _event_payloads(streamed.text) == [
+        {"type": "delta", "text": expected_reply},
+        {"type": "done", "text": expected_reply, "model": aiml.MODEL_NAME},
+    ]
 
 
 def test_rejects_conversation_not_ending_with_user(client: TestClient) -> None:

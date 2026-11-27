@@ -23,6 +23,7 @@ Groq API
 - Safe-area + keyboard handling, dark mode, web `Enter` to send / `Shift+Enter` for new lines
 - Preset prompts on the empty screen and a live backend/model status badge
 - Server-side history trimming and a configurable system prompt
+- AIML-powered local replies for common greetings, without a Groq API call
 
 ## Prerequisites
 
@@ -129,6 +130,9 @@ are limited to validated fields (`product`, `stock_quantity`, `supplier`, and
 `reorder_point`).
 For profit-ranking questions, it aggregates profit by product from the `sales`
 table. The workbook contains sales and profit, but no unit-price field.
+Common greetings are handled locally by the backend AIML rules in
+`src/ai_powered_inventory_assistant/greetings.aiml`; other messages continue to
+use the configured Groq model.
 
 ```text
 GET /api/datasets/sales?region=West&category=Electronics&limit=20

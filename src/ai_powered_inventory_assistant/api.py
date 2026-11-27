@@ -24,8 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from . import dataset
-from . import llm
+from . import aiml, dataset, llm
 from .config import settings
 
 logger = logging.getLogger("inventory_assistant.api")
@@ -95,7 +94,14 @@ def _sse(payload: dict[str, object]) -> str:
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
-async def _event_stream(prompt: list[dict[str, str]]) -> AsyncIterator[str]:
+async def _event_stream(
+    prompt: list[dict[str, str]], aiml_reply: str | None = None
+) -> AsyncIterator[str]:
+    if aiml_reply is not None:
+        yield _sse({"type": "delta", "text": aiml_reply})
+        yield _sse({"type": "done", "text": aiml_reply, "model": aiml.MODEL_NAME})
+        return
+
     parts: list[str] = []
     try:
         async for delta in llm.stream_chat(prompt):
@@ -175,8 +181,9 @@ def sales_summary(
 
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest) -> StreamingResponse:
+    aiml_reply = aiml.respond(request.messages[-1].content)
     return StreamingResponse(
-        _event_stream(_build_prompt(request.messages)),
+        _event_stream(_build_prompt(request.messages), aiml_reply),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",
@@ -188,6 +195,10 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest) -> dict[str, object]:
+    aiml_reply = aiml.respond(request.messages[-1].content)
+    if aiml_reply is not None:
+        return {"ok": True, "reply": aiml_reply, "model": aiml.MODEL_NAME}
+
     parts: list[str] = []
     try:
         async for delta in llm.stream_chat(_build_prompt(request.messages)):

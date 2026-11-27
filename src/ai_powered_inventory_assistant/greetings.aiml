@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<aiml version="1.0.1">
+  <category>
+    <pattern>HI</pattern>
+    <template>Hello! How can I help with your inventory today?</template>
+  </category>
+  <category>
+    <pattern>HI THERE</pattern>
+    <template>Hello! How can I help with your inventory today?</template>
+  </category>
+  <category>
+    <pattern>HELLO</pattern>
+    <template>Hello! How can I help with your inventory today?</template>
+  </category>
+  <category>
+    <pattern>HELLO THERE</pattern>
+    <template>Hello! How can I help with your inventory today?</template>
+  </category>
+  <category>
+    <pattern>HEY</pattern>
+    <template>Hey! What can I help you with?</template>
+  </category>
+  <category>
+    <pattern>HOW ARE YOU</pattern>
+    <template>I'm doing well, thanks for asking! How can I help with your inventory?</template>
+  </category>
+  <category>
+    <pattern>HOW * DOING</pattern>
+    <template>I'm doing well, thanks for asking! How can I help with your inventory?</template>
+  </category>
+  <category>
+    <pattern>HI MY NAME IS * HOW U DOING</pattern>
+    <template>AM DOING GREAT <star/>! WHAT DO YOU NEED HELP WITH?</template>
+  </category>
+</aiml>
